@@ -17,6 +17,25 @@
   loop_control:
     loop_var: path_folder
 
+- name: Reinstall (upgrade) filebeat
+  block:
+  - win_service:
+      name: filebeat
+      state: absent
+
+  - win_file:
+      name: '{{ win_download_path }}\filebeat.zip'
+      state: absent
+
+  - win_file:
+      name: '{{ win_download_path }}/filebeat-{{ filebeat_version }}-windows-x86_64'
+      state: absent
+
+  - win_file:
+      name: '{{ path.home }}'
+      state: absent
+  when: reinstall is defined
+  
 - name: Download filebeat
   win_get_url:
     url: 'https://artifacts.elastic.co/downloads/beats/filebeat/filebeat-{{ filebeat_version }}-windows-x86_64.zip'
@@ -37,40 +56,23 @@
     dest: '{{ path.home }}/'
     force: false
     remote_src: true
-  notify: Restart filebeat win
 
 - name: Templating filebeat configuration
   win_template:
     src: '{{ fb_path_file.src }}'
     dest: '{{ fb_path_file.dst }}'
   loop:
-    - src: filebeat.yml.j2
-      dst: '{{ path.config }}\filebeat.yml'
-    - src: filebeat-template.bat.j2
-      dst: '{{ path.home }}\filebeat.bat'
+    - src: '{{ filebeat_template_src }}'
+      dst: '{{ path.home }}\filebeat.yml'
   loop_control:
     loop_var: fb_path_file
-  notify: Restart filebeat win
 
-- name: Install nssm
-  win_chocolatey:
-    name: nssm
-    state: present
+- name: Install filebeat service with distribution script
+  win_command: powershell install-service-filebeat.ps1
+  args:
+    chdir: '{{ path.home }}'
 
-- name: Create service via nssm
-  win_nssm:
-    name: '{{ filebeat_service_name }}'
-    application: '{{ path.home }}\filebeat.bat'
-    state: present
-  notify: Restart filebeat win
-
-- name: Ensure that filebeat path present in 'Path' variable
-  win_path:
-    elements: '{{ path.home }}'
-    state: present
-    scope: machine
-
-- name: Start a service
+- name: Start filebeat service
   win_service:
-    name: '{{ filebeat_service_name }}'
+    name: filebeat
     state: started

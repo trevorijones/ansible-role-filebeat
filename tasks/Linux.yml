@@ -20,7 +20,7 @@
 
     - name: Copy Configuration File
       template:
-        src: filebeat.yml.j2
+        src: '{{ filebeat_template_src }}'
         dest: '{{ path.config }}/filebeat.yml'
         owner: root
         group: root
